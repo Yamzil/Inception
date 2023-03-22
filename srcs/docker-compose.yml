@@ -1,0 +1,135 @@
+version: '3.3'
+
+services:
+  nginx:
+    build: ./requirements/nginx
+    image: nginx
+    container_name: nginx
+    networks:
+      - network-inception
+    ports:
+      - "443:443"
+    volumes:
+      - www-vol:/var/www/html/wordpress
+    depends_on:
+      - wordpress
+    restart: on-failure
+
+  mariadb:
+    build: ./requirements/mariadb
+    image: mariadb
+    container_name: mariadb
+    networks:
+      - network-inception
+    env_file:
+      - .env
+    volumes:
+      - db-vol:/var/lib/mysql
+    restart: always
+
+  wordpress:
+    build: ./requirements/wordpress
+    image: wordpress
+    container_name: wordpress
+    networks:
+      - network-inception
+    env_file:
+      - .env
+    depends_on:
+      - mariadb
+    volumes:
+       - www-vol:/var/www/html/wordpress
+    restart: always
+  
+  adminer:
+    build: ./requirements/bonus/adminer
+    image: adminer
+    container_name: adminer
+    networks:
+      - network-inception
+    volumes:
+      - db-vol:/var/lib/mysql
+    ports:
+      - "8080:8080"
+    environment: 
+      ADMINER_DEFAULT_SERVER: mariadb
+    depends_on:
+      - mariadb
+    restart: on-failure
+
+  ftp:
+      build: ./requirements/bonus/ftp
+      image: ftp
+      container_name: ftp
+      env_file:
+        - .env
+      restart: always
+      depends_on:
+        - wordpress
+      volumes:
+        - www-vol:/home/yamzil
+      ports:
+        - "21:21"
+        - "20:20"
+        - "40000-40010:40000-40010"
+      networks:
+        - network-inception
+  
+  redis:
+      build: ./requirements/bonus/redis
+      container_name: redis
+      env_file:
+        - .env
+      restart: always
+      depends_on:
+        - wordpress
+      volumes:
+        - www-vol:/home/yamzil
+      ports:
+        - "6379:6379"
+      networks:
+        - network-inception
+
+  web:
+      build: ./requirements/bonus/web
+      image: web
+      container_name: web
+      restart: always
+      ports:
+        - "8085:80"
+      networks:
+        - network-inception
+
+  cadvisor:
+      build: ./requirements/bonus/cadvisor
+      image: cadvisor
+      container_name: cadvisor
+      restart: always
+      volumes:
+        - /:/rootfs:ro
+        - /var/run:/var/run:ro
+        - /sys:/sys:ro
+        - /var/lib/docker:/var/lib/docker:ro
+        - /dev/disk:/dev/disk:ro
+      ports:
+        - "9876:8080"
+      networks:
+        - network-inception
+      privileged: true
+
+
+networks:
+  network-inception:
+    driver: bridge
+
+volumes:
+  db-vol:
+    driver_opts:
+      type: 'none'
+      o: bind
+      device: /home/yamzil/Data/db-data
+  www-vol:
+    driver_opts:
+      type: 'none'
+      o: bind
+      device: /home/yamzil/Data/www-vol
